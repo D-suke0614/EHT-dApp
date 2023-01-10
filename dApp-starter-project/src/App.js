@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { ethers } from 'ethers'
+import abi from './utils/WavePortal.json'
 import './App.css'
 
 const App = () => {
@@ -6,6 +8,12 @@ const App = () => {
    * ユーザのパブリックウォレットを保存するために使用する状態変数の定義
    */
   const [currentAccount, setCurrentAccount] = useState('')
+
+  // デプロイされたコントラクトのアドレス
+  const contractAddress = '0xd5aE441a69ACA12E1B46783a23A38B386826a28e'
+
+  const contractABI = abi.abi
+
   console.log('currentAccount :', currentAccount)
   /**
    * window.ethereumにアクセスできることを確認
@@ -56,6 +64,47 @@ const App = () => {
   }
 
   /**
+   * waveの回数をアカウント
+   */
+  const wave = async () => {
+    try {
+      const { ethereum } = window
+      if (ethereum) {
+        // provider = MetaMaskを設定
+        const provider = new ethers.providers.Web3Provider(ethereum)
+
+        // signer = ユーザのwalletアドレスを抽象化したもの
+        // provider.getSigner()を呼び出すだけで、
+        // ユーザはwalletアドレスを使用してトランザクションに署名し、
+        // そのデータをイーサリアムネットワークに送信できる
+        const signer = provider.getSigner()
+        // コントラクトへの接続
+        const wavePortalContract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        )
+        let count = await wavePortalContract.getTotalWaves()
+        console.log('Retrieved total wave count...', count.toNumber())
+
+        /**
+         * コントラクトに👋（wave）を書き込む
+         */
+        const waveTxn = await wavePortalContract.wave()
+        console.log('Mining...', waveTxn.hash)
+        await waveTxn.wait()
+        console.log('Mined -- ', waveTxn.hash)
+        count = await wavePortalContract.getTotalWaves()
+        console.log('Retrieved total wave count...', count.toNumber())
+      } else {
+        console.log('Ethereum object does not exist!')
+      }
+    } catch (e) {
+      console.log(e)
+    }
+  }
+
+  /**
    * Webページがロードされた時に下記メソッドを実行
    */
   useEffect(() => {
@@ -81,7 +130,7 @@ const App = () => {
             ✨
           </span>
         </div>
-        <button className='waveButton' onClick={null}>
+        <button className='waveButton' onClick={wave}>
           Wave at Me
         </button>
         {!currentAccount && (
