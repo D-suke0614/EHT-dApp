@@ -14,6 +14,85 @@ const App = () => {
 
   const contractABI = abi.abi
 
+  const getAllWaves = async () => {
+    const { ethereum } = window
+
+    try {
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum)
+        const signer = provider.getSigner()
+        const wavePortalContract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        )
+        // コントラクトからgetAllWavesメソッドを呼び出す
+        const waves = await wavePortalContract.getAllWaves()
+
+        // UIに必要なのは、Address, timestamp, messageだけなので、以下のように設定
+        const wavesCleaned = waves.map((wave) => {
+          return {
+            address: wave.waver,
+            timestamp: new Date(wave.timestamp * 1000),
+            message: wave.message
+          }
+        })
+
+        /**
+         * React Stateにデータを格納
+         */
+        setAllWaves(wavesCleaned)
+      } else {
+        console.log('Ethereum object does not exist!')
+      }
+    } catch (e) {
+      console.log(e)
+    }
+  }
+
+  /**
+   * emitされたときに発火するイベント
+   */
+  useEffect(() => {
+    let wavePortalContract
+
+    const onNewWave = (from, timestamp, message) => {
+      console.log('NewWave', from, timestamp, message)
+      setAllWaves((preState) => [
+        ...preState,
+        {
+          address: from,
+          timestamp: new Date(timestamp * 1000),
+          message: message
+        }
+      ])
+    }
+    /**
+     * NewWaveイベントがコントラクトから発信されたときに、情報を受け取る
+     */
+    if (window.ethereum) {
+      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const signer = provider.getSigner()
+
+      wavePortalContract = new ethers.Contract(
+        contractAddress,
+        contractABI,
+        signer
+      )
+      wavePortalContract.on('NewWave', onNewWave)
+    }
+
+    /**
+     * メモリリークを防ぐために、NewWaveのイベントを解除する
+     */
+    return () => {
+      if (wavePortalContract) {
+        wavePortalContract.off('NewWave', onNewWave)
+      }
+    }
+  }, [])
+
+
   console.log('currentAccount :', currentAccount)
   /**
    * window.ethereumにアクセスできることを確認
